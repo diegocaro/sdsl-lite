@@ -425,6 +425,132 @@ class wm_int
             return i-1;
         };
 
+     
+        size_type next_value_pos(size_type lb, size_type rb, value_type c) const {
+            bool success = true;
+            return _next_value_pos(lb, rb, 0, 1u << m_max_level, c, 0, success);
+        }
+        
+        
+        size_type _next_value_pos(size_type lb, size_type rb, value_type vlb, value_type vrb, value_type c, uint32_t level, bool &success) const {
+            if (lb >= rb) {
+                success = false;
+                return m_size;
+            }
+            
+            if (m_max_level == level) {
+                success = true;
+                return lb;
+            }
+            
+            size_type b_level = level * m_size;  // begin of current level in the bitmap
+            size_type e_level = (level+1) * m_size;  // end of current level in the bitmap
+            
+            size_type rank_b = m_tree_rank(b_level); // rank1 before start the current level
+            
+            size_type s0, e0, s1, e1;
+            s1 = m_tree_rank(b_level + lb) - rank_b; // ones in [b..lb) in current level
+            e1 = m_tree_rank(b_level + rb) - rank_b; // ones in [b..rb] in current level
+            s0 = lb - s1; // number of zeroes in [b..lb]
+            e0 = rb - e1; // number of zeroes in [b..rb]
+            
+            size_type z_level = m_size - (m_tree_rank(e_level) - rank_b); // number of zeroes in current level
+            
+            value_type vocmid = (vrb-vlb)/2 + vlb;
+            size_type r, b;
+            if (c >= vocmid) {
+                // right side of the alphabet
+                r = _next_value_pos(s1 + z_level, e1 + z_level, vocmid, vrb, c, level+1, success);
+                if (r == m_size) return r;
+                // b = bitmap[level]->select1(r-Z[level]+1);
+                b = m_tree_select1(rank_b + r - z_level + 1) - b_level;
+                return b;
+                
+            }
+            else {
+                //left side 
+                r = _next_value_pos(s0, e0, vlb, vocmid, c, level+1, success);
+                if (success) {
+                    // b = bitmap[level]->select0(r+1);
+                    b = m_tree_select0( (b_level - rank_b) + r + 1) - b_level;
+                    return b;
+                }
+                else {
+                    //left failed, going right side
+                    r = _next_value_pos(s1 + z_level, e1 + z_level, vocmid, vrb, vocmid, level+1, success);
+                    if (r == m_size) return r;
+                    // b = bitmap[level]->select1(r-Z[level]+1);
+                    b = m_tree_select1(rank_b + r - z_level + 1) - b_level;
+                    return b;
+                }
+                
+        	}
+            return m_size;
+        }
+        
+        
+        
+        size_type prev_value_pos(size_type lb, size_type rb, value_type c) const {
+            bool success = true;
+            return _prev_value_pos(lb, rb, 0, 1u << m_max_level, c, 0, success);
+        }
+        
+        
+        size_type _prev_value_pos(size_type lb, size_type rb, value_type vlb, value_type vrb, value_type c, uint32_t level, bool &success) const {
+            if (lb >= rb) {
+                success = false;
+                return m_size;
+            }
+            
+            if (m_max_level == level) {
+                success = true;
+                return lb;
+            }
+            
+            size_type b_level = level * m_size;  // begin of current level in the bitmap
+            size_type e_level = (level+1) * m_size;  // end of current level in the bitmap
+            
+            size_type rank_b = m_tree_rank(b_level); // rank1 before start the current level
+            
+            size_type s0, e0, s1, e1;
+            s1 = m_tree_rank(b_level + lb) - rank_b; // ones in [b..lb) in current level
+            e1 = m_tree_rank(b_level + rb) - rank_b; // ones in [b..rb] in current level
+            s0 = lb - s1; // number of zeroes in [b..lb]
+            e0 = rb - e1; // number of zeroes in [b..rb]
+            
+            size_type z_level = m_size - (m_tree_rank(e_level) - rank_b); // number of zeroes in current level
+            
+            value_type vocmid = (vrb-vlb)/2 + vlb;
+            size_type r, b;
+            if (c >= vocmid) {
+                // right side of the alphabet
+                r = _prev_value_pos(s1 + z_level, e1 + z_level, vocmid, vrb, c, level+1, success);
+                
+                if (success) {
+                    b = m_tree_select1(rank_b + r - z_level + 1) - b_level;
+                    return b;
+                }
+                else {
+                    //right failed, going left
+                    r = _prev_value_pos(s0, e0, vlb, vocmid, vocmid-1, level+1, success);
+                    if (r == m_size) return r;
+                    // b = bitmap[level]->select1(r-Z[level]+1);
+                    b = m_tree_select0( (b_level - rank_b) + r + 1) - b_level;
+                    return b;
+                }
+                
+            }
+            else {
+                //left side 
+                r = _prev_value_pos(s0, e0, vlb, vocmid, c, level+1, success);
+                if (r == m_size) return r;
+                b = m_tree_select0( (b_level - rank_b) + r + 1) - b_level;
+                return b;
+        	}
+            return m_size;
+        }
+        
+
         //! range_search_2d searches points in the index interval [lb..rb] and value interval [vlb..vrb].
         /*! \param lb     Left bound of index interval (inclusive)
          *  \param rb     Right bound of index interval (inclusive)
